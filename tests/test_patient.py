@@ -31,13 +31,13 @@ def check_log_size(log, increased=False):
     return deco
 
 
-def setup():
+def setup_module(__main__):
     for file in [GOOD_LOG_FILE, ERROR_LOG_FILE, CSV_PATH]:
         with open(file, 'w', encoding='utf-8') as f:
             f.write('')
 
 
-def teardown():
+def teardown_module(__name__):
     for file in [GOOD_LOG_FILE, ERROR_LOG_FILE, CSV_PATH]:
         os.remove(file)
 
@@ -180,7 +180,7 @@ def test_wrong_type_assignment(patient, field, param):
 ))
 @check_log_size("error", increased=True)
 @check_log_size("good")
-def test_wrong_type_assignment(patient, field, param):
+def test_wrong_value_assignment(patient, field, param):
     try:
         setattr(patient, field, param)
         assert False, f"ValueError for {field} assignment not invoked"
