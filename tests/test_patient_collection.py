@@ -53,7 +53,8 @@ def test_limit_usual():
     for i, patient in enumerate(collection.limit(8)):
         true_patient = Patient(*GOOD_PARAMS[i])
         for field in PATIENT_FIELDS:
-            assert getattr(patient, field) == getattr(true_patient, field), f"Wrong attr {field} for {GOOD_PARAMS[i]} in limit"
+            assert getattr(patient, field) == getattr(true_patient,
+                                                      field), f"Wrong attr {field} for {GOOD_PARAMS[i]} in limit"
 
 
 @pytest.mark.usefixtures('prepare')

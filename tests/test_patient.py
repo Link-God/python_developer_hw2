@@ -6,9 +6,11 @@ import itertools
 import pytest
 
 from homework.config import GOOD_LOG_FILE, ERROR_LOG_FILE, CSV_PATH, PHONE_FORMAT, PASSPORT_TYPE, PASSPORT_FORMAT, \
-    INTERNATIONAL_PASSPORT_FORMAT, INTERNATIONAL_PASSPORT_TYPE, DRIVER_LICENSE_TYPE, DRIVER_LICENSE_FORMAT
+    INTERNATIONAL_PASSPORT_FORMAT, INTERNATIONAL_PASSPORT_TYPE, DRIVER_LICENSE_TYPE, DRIVER_LICENSE_FORMAT, GOOD_LOG, \
+    ERROR_LOG
 from homework.patient import Patient
 from tests.constants import GOOD_PARAMS, OTHER_GOOD_PARAMS, WRONG_PARAMS, PATIENT_FIELDS
+import logging
 
 
 def get_len(file):
@@ -20,6 +22,7 @@ def check_log_size(log, increased=False):
     def deco(func):
         log_map = {"error": ERROR_LOG_FILE, "good": GOOD_LOG_FILE, "csv": CSV_PATH}
         log_path = log_map.get(log, log)
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             log_len = get_len(log_path)
@@ -27,7 +30,9 @@ def check_log_size(log, increased=False):
             new_len = get_len(log_path)
             assert new_len > log_len if increased else new_len == log_len, f"Wrong {log} file length"
             return result
+
         return wrapper
+
     return deco
 
 
@@ -38,6 +43,13 @@ def setup_module(__main__):
 
 
 def teardown_module(__name__):
+    # так как в дескрипторе мы решили не закрывать hendlerы , но для удаления их закрыть все равно надо
+    # поэтому предлагаю добавить что-то такое
+    # можно тесты апдейтнуть как-то так
+    # в homework.config доабвить ИМЕНА логгеров , импротировать их и ...
+    # таким образом не надо shutdown писать ну и закрываем логи только которые используем
+    for fh in (list(logging.getLogger(GOOD_LOG).handlers) + list(logging.getLogger(ERROR_LOG).handlers))[::-1]:
+        fh.close()
     for file in [GOOD_LOG_FILE, ERROR_LOG_FILE, CSV_PATH]:
         os.remove(file)
 
@@ -102,11 +114,11 @@ def test_creation_acceptable_driver_license(driver_license):
 @check_log_size("error", increased=True)
 @check_log_size("good")
 def test_creation_wrong_type_params(i):
-        try:
-            Patient(*GOOD_PARAMS[:i], 1.8, *GOOD_PARAMS[i+1:])
-            assert False, f"TypeError for {PATIENT_FIELDS[i]} not invoked"
-        except TypeError:
-            assert True
+    try:
+        Patient(*GOOD_PARAMS[:i], 1.8, *GOOD_PARAMS[i + 1:])
+        assert False, f"TypeError for {PATIENT_FIELDS[i]} not invoked"
+    except TypeError:
+        assert True
 
 
 # неверные значения
@@ -115,7 +127,7 @@ def test_creation_wrong_type_params(i):
 @check_log_size("good")
 def test_creation_wrong_params(i):
     try:
-        Patient(*GOOD_PARAMS[:i], WRONG_PARAMS[i], *GOOD_PARAMS[i+1:])
+        Patient(*GOOD_PARAMS[:i], WRONG_PARAMS[i], *GOOD_PARAMS[i + 1:])
         assert False, f"ValueError for {PATIENT_FIELDS[i]} not invoked"
     except ValueError:
         assert True
