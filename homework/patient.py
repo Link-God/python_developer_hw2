@@ -6,7 +6,7 @@ import csv
 
 def check_name_value(name: str):
     # дефисы в имени ...
-    if re.search(r'[^\w\s]+', name):
+    if re.search(r'[^a-zA-Zа-яёА-ЯЁ\s]+', name):
         return False, name
     return True, name.capitalize()
 
