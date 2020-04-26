@@ -6,7 +6,7 @@ import csv
 
 def check_name_value(name: str):
     # дефисы в имени ...
-    if re.search(r'[^a-zA-Zа-яА-Я\s]+', name):
+    if re.search(r'[^\w\s]+', name):
         return False, name
     return True, name.capitalize()
 
@@ -189,13 +189,18 @@ class PatientCollection:
 
     def __iter__(self):
         with open(self.path_to_csv_file, 'rb', buffering=0) as file:
-            while line := file.readline():
+            while True:
+                line = file.readline()
+                if not line:
+                    break
                 yield Patient(*line.decode('utf-8').split(','))
 
     def limit(self, n):
         counter = 0
         with open(self.path_to_csv_file, 'rb', buffering=0) as file:
-            while counter != n:
+            while True:
                 line = file.readline()
+                if not line or counter == n:
+                    break
                 yield Patient(*line.decode('utf-8').split(','))
                 counter += 1
