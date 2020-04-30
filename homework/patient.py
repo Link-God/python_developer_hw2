@@ -2,6 +2,7 @@ from homework.log import info_logger, error_logger
 import re
 import datetime
 import csv
+from functools import partial
 
 
 def check_name_value(name: str):
@@ -58,19 +59,24 @@ class BaseDescriptor:
     def __get__(self, instance, owner):
         return instance.__dict__[self.atr_name]
 
+    def _set(self, instance, value, check_func, able_for_change=True):
+        if not isinstance(value, str):
+            error_logger.error(f'{value} must by string')
+            raise TypeError
+        is_good, new_value = check_func(value)
+        if is_good:
+            if instance.__dict__.get(self.atr_name) and able_for_change:
+                info_logger.info(f'For {instance} was set new {self.atr_name} = {new_value}')
+            instance.__dict__[self.atr_name] = new_value
+        else:
+            error_logger.error(f'Wrong format : {new_value}')
+            raise ValueError(f'smt wrong in {new_value}')
+
 
 class Name(BaseDescriptor):
     def __set__(self, instance, value):
         if not instance.__dict__.get(self.atr_name):
-            if not isinstance(value, str):
-                error_logger.error(f'{value} must by string')
-                raise TypeError
-            is_good, name = check_name_value(value)
-            if is_good:
-                instance.__dict__[self.atr_name] = name
-            else:
-                error_logger.error(f'Wrong format : {name}')
-                raise ValueError(f'smt wrong in {name}')
+            self._set(instance, value, check_name_value, False)
         else:
             error_logger.error(f'Try to set name of {instance}')
             raise AttributeError()
@@ -78,64 +84,26 @@ class Name(BaseDescriptor):
 
 class BirthDate(BaseDescriptor):
     def __set__(self, instance, value):
-        if not isinstance(value, str):
-            error_logger.error(f'{value} must by string')
-            raise TypeError
-        is_good, date = check_date_value(value)
-        if is_good:
-            if instance.__dict__.get(self.atr_name):
-                info_logger.info(f'For {instance} was set new birth_date = {value}')
-            instance.__dict__[self.atr_name] = date
-        else:
-            error_logger.error(f'Wrong format : {date}')
-            raise ValueError(f'smt wrong in {date}')
+        self._set(instance, value, check_date_value)
 
 
 class Phone(BaseDescriptor):
     def __set__(self, instance, value):
-        if not isinstance(value, str):
-            error_logger.error(f'{value} must by string')
-            raise TypeError
-        is_good, phone = check_phone_value(value)
-        if is_good:
-            if instance.__dict__.get(self.atr_name):
-                info_logger.info(f'For {instance} was set new phone = {value}')
-            instance.__dict__[self.atr_name] = phone
-        else:
-            error_logger.error(f'Wrong format : {phone}')
-            raise ValueError(f'smt wrong in {phone}')
+        self._set(instance, value, check_phone_value)
 
 
 class DocumentType(BaseDescriptor):
     possible_types = frozenset(('паспорт', 'заграничный паспорт', 'водительское удостоверение'))
 
     def __set__(self, instance, value):
-        if not isinstance(value, str):
-            error_logger.error(f'{value} must by string')
-            raise TypeError
-        is_good, doc_type = check_document_type_value(value, self.possible_types)
-        if is_good:
-            if instance.__dict__.get(self.atr_name):
-                info_logger.info(f'For {instance} was set new doc_type = {value}')
-            instance.__dict__[self.atr_name] = doc_type
-        else:
-            error_logger.error(f'Wrong format : {doc_type}')
-            raise ValueError(f'smt wrong in {doc_type}')
+        partial_check_func = partial(check_document_type_value, possible_types=self.possible_types)
+        self._set(instance, value, partial_check_func)
 
 
 class DocumentID(BaseDescriptor):
     def __set__(self, instance, value):
-        if not isinstance(value, str):
-            error_logger.error(f'{value} must by string')
-            raise TypeError
-        is_good, doc_id = check_document_id_value(value, instance.document_type)
-        if is_good:
-            if instance.__dict__.get(self.atr_name):
-                info_logger.info(f'For {instance} was set new doc_id = {value}')
-            instance.__dict__[self.atr_name] = doc_id
-        else:
-            error_logger.error(f'Wrong format : {doc_id}')
-            raise ValueError(f'smt wrong in {doc_id}')
+        partial_check_func = partial(check_document_id_value, doc_type=instance.document_type)
+        self._set(instance, value, partial_check_func)
 
 
 class Patient:
