@@ -1,10 +1,11 @@
 import os
 
 import pytest
-
-from homework.config import PASSPORT_TYPE, CSV_PATH
+# для удаления
+from homework.config import PASSPORT_TYPE, CSV_PATH, GOOD_LOG_FILE, GOOD_LOG
 from homework.patient import PatientCollection, Patient
 from tests.constants import PATIENT_FIELDS
+import logging
 
 GOOD_PARAMS = (
     ("Кондрат", "Рюрик", "1971-01-11", "79160000000", PASSPORT_TYPE, "0228 000000"),
@@ -30,7 +31,11 @@ def prepare():
     for params in GOOD_PARAMS:
         Patient(*params).save()
     yield
-    os.remove(CSV_PATH)
+    # при создании пациентов появляется успешные логи, мб их тоже удалить
+    for fh in (list(logging.getLogger(GOOD_LOG).handlers))[::-1]:
+        fh.close()
+    for file in [GOOD_LOG_FILE, CSV_PATH]:
+        os.remove(file)
 
 
 @pytest.mark.usefixtures('prepare')

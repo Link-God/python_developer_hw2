@@ -155,20 +155,16 @@ class PatientCollection:
     def __init__(self, path_to_file):
         self.path_to_csv_file = path_to_file
 
-    def __iter__(self):
+    def __iter__(self, count=False, n=None):
+        counter = 0 if count else None
         with open(self.path_to_csv_file, 'rb', buffering=0) as file:
             while True:
                 line = file.readline()
-                if not line:
+                if not line or (count and counter == n):
                     break
                 yield Patient(*line.decode('utf-8').split(','))
+                if count:
+                    counter += 1
 
     def limit(self, n):
-        counter = 0
-        with open(self.path_to_csv_file, 'rb', buffering=0) as file:
-            while True:
-                line = file.readline()
-                if not line or counter == n:
-                    break
-                yield Patient(*line.decode('utf-8').split(','))
-                counter += 1
+        return self.__iter__(True, n)
