@@ -1,8 +1,9 @@
-from homework.log import info_logger, error_logger
+import logging
+import homework.log
 import re
 import datetime
 import csv
-from functools import partial
+from functools import partial, wraps
 
 
 def check_name_value(name: str):
@@ -52,34 +53,77 @@ def check_document_id_value(doc_id: str, doc_type: str):
         return False, doc_id
 
 
+def set_method_logger(func):
+    @wraps(func)
+    def wrapper(self, instance, value, check_func, able_for_change=True):
+        new_value = value
+        try:
+            func(self, instance, value, check_func, able_for_change)
+            _, new_value = check_func(value)
+        except TypeError:
+            instance.error_logger.error(f'{value} must by string')
+            raise TypeError
+        except ValueError:
+            instance.error_logger.error(f'Wrong format : {new_value}')
+            raise ValueError
+        except AttributeError:
+            instance.error_logger.error(f'Try to set {self.atr_name} of {instance}')
+            raise AttributeError
+        else:
+            # не  инициализация, а изменение
+            if instance:
+                instance.info_logger.info(f'For {instance} was set new {self.atr_name} = {new_value}')
+
+    return wrapper
+
+
+def file_method_logger(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            func(self, *args, **kwargs)
+        except FileExistsError:
+            self.error_logger.error(f'Raise FileExistsError in save() with {self}')
+        except FileNotFoundError:
+            self.error_logger.error(f'Raise FileNotFoundError in save() with {self}')
+        except IsADirectoryError:
+            self.error_logger.error(f'Raise IsADirectoryError in save() with {self}')
+        except PermissionError:
+            self.error_logger.error(f'Raise PermissionError in save() with {self}')
+        else:
+            self.info_logger.info(f'patient {self} was successfully added to file')
+
+    return wrapper
+
+
 class BaseDescriptor:
     def __init__(self, atr_name):
         self.atr_name = atr_name
 
     def __get__(self, instance, owner):
-        return instance.__dict__[self.atr_name]
+        value = instance.__dict__.get(self.atr_name)
+        if value:
+            return value
+        else:
+            # вроде не нарушает логику и нужно для hasattr()
+            raise AttributeError
 
+    @set_method_logger
     def _set(self, instance, value, check_func, able_for_change=True):
+        if not able_for_change and hasattr(instance, self.atr_name):
+            raise AttributeError
         if not isinstance(value, str):
-            error_logger.error(f'{value} must by string')
             raise TypeError
         is_good, new_value = check_func(value)
         if is_good:
-            if instance.__dict__.get(self.atr_name) and able_for_change:
-                info_logger.info(f'For {instance} was set new {self.atr_name} = {new_value}')
             instance.__dict__[self.atr_name] = new_value
         else:
-            error_logger.error(f'Wrong format : {new_value}')
-            raise ValueError(f'smt wrong in {new_value}')
+            raise ValueError
 
 
 class Name(BaseDescriptor):
     def __set__(self, instance, value):
-        if not instance.__dict__.get(self.atr_name):
-            self._set(instance, value, check_name_value, False)
-        else:
-            error_logger.error(f'Try to set name of {instance}')
-            raise AttributeError()
+        self._set(instance, value, check_name_value, False)
 
 
 class BirthDate(BaseDescriptor):
@@ -116,39 +160,36 @@ class Patient:
     document_id = DocumentID('document_id')
 
     def __init__(self, first_name, last_name, birth_date, phone, document_type, document_id):
+        self.info_logger = logging.getLogger('Info_Logger')
+        self.error_logger = logging.getLogger('Error_Logger')
         self.first_name = first_name
         self.last_name = last_name
         self.birth_date = birth_date
         self.phone = phone
         self.document_type = document_type
         self.document_id = document_id
-        info_logger.info(f'patient {self} was successfully created')
+        self.info_logger.info(f'patient {self} was successfully created')
 
     @staticmethod
     def create(*args, **kwargs):
         return Patient(*args, **kwargs)
 
+    @file_method_logger
     def save(self):
-        try:
-            with open("patients.csv", 'a', encoding='utf-8', newline='') as csv_file:
-                writer = csv.writer(csv_file, delimiter=',')
-                patient = [self.first_name, self.last_name, self.birth_date, self.phone, self.document_type,
-                           self.document_id]
-                writer.writerow(patient)
-        except FileExistsError:
-            error_logger.error(f'Raise FileExistsError in save() with {self}')
-        except FileNotFoundError:
-            error_logger.error(f'Raise FileNotFoundError in save() with {self}')
-        except IsADirectoryError:
-            error_logger.error(f'Raise IsADirectoryError in save() with {self}')
-        except PermissionError:
-            error_logger.error(f'Raise PermissionError in save() with {self}')
-        else:
-            info_logger.info(f'patient {self} was successfully added to file')
+        with open("patients.csv", 'a', encoding='utf-8', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=',')
+            patient = [self.first_name, self.last_name, self.birth_date, self.phone, self.document_type,
+                       self.document_id]
+            writer.writerow(patient)
 
     def __str__(self):
         return f'{self.first_name}, {self.last_name}, {self.birth_date}, {self.phone}, {self.document_type},' \
                f' {self.document_id}'
+
+    def __bool__(self):
+        # проверка на то все ли инициализированны
+        attrs = filter(lambda atr: not atr.startswith('__'), dir(self))
+        return all((hasattr(self, atr) for atr in attrs))
 
 
 class PatientCollection:
@@ -168,3 +209,7 @@ class PatientCollection:
 
     def limit(self, n):
         return self.__iter__(True, n)
+
+
+a = Patient("Нурсултан", "Назарбаев", "1900-01-01", "+7-916-111-11-11", "паспорт", "1111 111111")
+a.phone = '+7-916-111-11-22'
