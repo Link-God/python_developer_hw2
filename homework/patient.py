@@ -4,6 +4,7 @@ import re
 import datetime
 import csv
 from functools import partial, wraps
+from itertools import islice
 
 
 def check_name_value(name: str):
@@ -196,20 +197,14 @@ class PatientCollection:
     def __init__(self, path_to_file):
         self.path_to_csv_file = path_to_file
 
-    def __iter__(self, count=False, n=None):
-        counter = 0 if count else None
+    def __iter__(self):
         with open(self.path_to_csv_file, 'rb', buffering=0) as file:
             while True:
                 line = file.readline()
-                if not line or (count and counter == n):
+                if not line:
                     break
                 yield Patient(*line.decode('utf-8').split(','))
-                if count:
-                    counter += 1
 
     def limit(self, n):
-        return self.__iter__(True, n)
-
-
-a = Patient("Нурсултан", "Назарбаев", "1900-01-01", "+7-916-111-11-11", "паспорт", "1111 111111")
-a.phone = '+7-916-111-11-22'
+        # наверно более красиво, очевидно и по питоняче
+        return islice(self, n)
